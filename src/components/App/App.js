@@ -1,4 +1,4 @@
-import { Component } from 'react';
+import { useState, useEffect } from 'react';
 import './App.css';
 import Searchbar from '../Searchbar';
 import ImageGallery from '../ImageGallery';
@@ -7,92 +7,84 @@ import imageApi from '../../services/image-api';
 import MyLoader from '../MyLoader';
 import Modal from '../Modal';
 
-class App extends Component {
-  state = {
-    query: '',
-    page: 1,
-    searchResults: [],
-    loader: false,
-    showModal: false,
-    largeImageURL: '',
-    tags: '',
-  };
+function App() {
+  const [query, setQuery] = useState('');
+  const [page, setPage] = useState(1);
+  const [searchResults, setSearchResults] = useState([]);
+  const [loader, setLoader] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+  const [largeImageURL, setLargeImageURL] = useState('');
+  const [tags, setTags] = useState('');
 
-  componentDidUpdate(prevProps, prevState) {
-    if (prevState.query !== this.state.query) {
-      this.fetchImages().finally(() => this.setState({ loader: false }));
+  useEffect(() => {
+    if (!query) {
+      return;
     }
-  }
+    const fetchImages = () => {
+      setLoader(true);
+      return imageApi(query, page)
+        .then(res => {
+          setSearchResults(prevSearchResults => [...prevSearchResults, ...res]);
+          if (page !== 1) {
+            scrollDown();
+          }
+        })
+        .catch(err => console.log(err));
+    };
+    fetchImages().finally(() => setLoader(false));
+  }, [query, page]);
 
-  fetchImages = () => {
-    this.setState({ loader: true });
-    return imageApi(this.state.query, this.state.page)
-      .then(res => {
-        this.setState(prevState => ({
-          page: prevState.page + 1,
-          searchResults: [...prevState.searchResults, ...res],
-        }));
-      })
-      .catch(err => console.log(err));
+  const getQuery = value => {
+    setQuery(value);
+    setPage(1);
+    setSearchResults([]);
   };
 
-  getQuery = value =>
-    this.setState({
-      query: value,
-      page: 1,
-      searchResults: [],
-    });
-
-  handleButtonLoadMore = () => {
-    this.fetchImages()
-      .then(() => this.scrollDown())
-      .finally(() => this.setState({ loader: false }));
+  const handleButtonLoadMore = () => {
+    setLoader(true);
+    setPage(prevPage => prevPage + 1);
+    setLoader(false);
   };
 
-  scrollDown = () => {
+  const scrollDown = () => {
     window.scrollTo({
       top: document.documentElement.scrollHeight,
       behavior: 'smooth',
     });
   };
 
-  toggleModal = () => {
-    this.setState({ showModal: !this.state.showModal });
+  const toggleModal = () => {
+    setShowModal(!showModal);
   };
 
-  handleImageClick = ({ largeImageURL, tags }) => {
-    this.setState({ largeImageURL, tags });
-    this.toggleModal();
+  const handleImageClick = img => {
+    setLargeImageURL(img.largeImageURL);
+    setTags(img.tags);
+    toggleModal();
   };
 
-  render() {
-    const { loader, searchResults, query, showModal, largeImageURL, tags } =
-      this.state;
-    const { getQuery, handleImageClick, handleButtonLoadMore, toggleModal } =
-      this;
-    return (
-      <div className="App">
-        <Searchbar getQuery={getQuery} />
-        {searchResults.length > 0 ? (
-          <ImageGallery
-            searchResults={searchResults}
-            handleImageClick={handleImageClick}
-          />
-        ) : (
-          query !== '' && !loader && <p className="noResult">No results😟</p>
-        )}
-        {searchResults.length > 0 && !loader && (
-          <Button handleButtonLoadMore={handleButtonLoadMore} />
-        )}
-        {loader && <MyLoader />}
-        {showModal && (
-          <Modal toggleModal={toggleModal}>
-            <img src={largeImageURL} alt={tags} />
-          </Modal>
-        )}
-      </div>
-    );
-  }
+  return (
+    <div className="App">
+      <Searchbar getQuery={getQuery} />
+      {searchResults.length > 0 ? (
+        <ImageGallery
+          searchResults={searchResults}
+          handleImageClick={handleImageClick}
+        />
+      ) : (
+        query !== '' && !loader && <p className="noResult">No results😟</p>
+      )}
+      {searchResults.length > 0 && !loader && (
+        <Button handleButtonLoadMore={handleButtonLoadMore} />
+      )}
+      {loader && <MyLoader />}
+      {showModal && (
+        <Modal toggleModal={toggleModal}>
+          <img src={largeImageURL} alt={tags} />
+        </Modal>
+      )}
+    </div>
+  );
 }
 
 export default App;
